@@ -1,0 +1,9 @@
+{
+    "epochs" : 1000,
+    "batch_size" : 16,
+    "lstm" : [256, 256, 256],
+    "dense" : 256,
+    "num_classes" : 5,
+    "maxlen" : 120,
+    "patience" : 50
+}
