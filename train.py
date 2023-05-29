@@ -9,6 +9,7 @@ from tensorflow.keras import layers, Input
 from tensorflow.keras.optimizers import RMSprop
 import json
 import pathlib
+from random import shuffle
 
 parser = argparse.ArgumentParser(description="Train LSTM model using specified dataset")
 parser.add_argument("-s", "--summary", action="store_true", help="print model summary")
@@ -31,6 +32,9 @@ if __name__ == "__main__":
 
     input_x, input_y, input_z = np.split(x, 3)
     val_x, val_y, val_z = np.split(x_val, 3)
+
+    ind_list = list(range(input_x.shape[0]))
+    shuffle(ind_list)
 
     nn_input_x = Input(shape=input_x.shape[1:], name='x_input')
     nn_input_y = Input(shape=input_y.shape[1:], name='y_input')
