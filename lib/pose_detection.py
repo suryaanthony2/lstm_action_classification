@@ -9,6 +9,7 @@ import numpy as np
 import json
 import pathlib
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from lib import prediction
 
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.3, model_complexity=1)
@@ -17,7 +18,7 @@ mp_drawing = mp.solutions.drawing_utils
 with open(os.fspath(pathlib.Path(__file__).parent.parent / "config.json"), "r") as f:
     cfg = json.load(f)
 
-maxlen = cfg["maxlen"]
+padding = cfg["maxlen"]
 
 def detectPose(image, pose, display=True):
     '''
@@ -184,9 +185,9 @@ def get_coordinates(classes, path, quiet=False, show=False):
             seq_y = train_input[:,:,1]
             seq_z = train_input[:,:,2]
             
-            seq_x = pad_sequences([seq_x], maxlen=maxlen, dtype='float32', padding='post', value=2)
-            seq_y = pad_sequences([seq_y], maxlen=maxlen, dtype='float32', padding='post', value=2)
-            seq_z = pad_sequences([seq_z], maxlen=maxlen, dtype='float32', padding='post', value=2)
+            seq_x = pad_sequences([seq_x], maxlen=padding, dtype='float32', padding='post', value=2)
+            seq_y = pad_sequences([seq_y], maxlen=padding, dtype='float32', padding='post', value=2)
+            seq_z = pad_sequences([seq_z], maxlen=padding, dtype='float32', padding='post', value=2)
             
             temp_x.extend(seq_x)
             temp_y.extend(seq_y)
@@ -301,6 +302,120 @@ def get_coordinates_lstm(path):
     return x
 
 
+def detect_real_time(camera, model):
+    pose_video = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.3, model_complexity=1)
+ 
+    maxlen = padding
 
+    x = np.full((1, maxlen, 23), 2.0)
+    y = np.full((1, maxlen, 23), 2.0)
+    z = np.full((1, maxlen, 23), 2.0)
+    
+    count = 0
+    delay = 4
+    
+    # Initialize the VideoCapture object to read from the webcam.
+    video = cv2.VideoCapture(camera)
+
+    # Create named window for resizing purposes
+    cv2.namedWindow('Pose Detection', cv2.WINDOW_NORMAL)
+
+    # Initialize the VideoCapture object to read from a video stored in the disk.
+
+    # Set video camera size
+    video.set(3,640)
+    video.set(4,360)
+
+    # Initialize a variable to store the time of the previous frame.
+    time1 = 0
+    # Iterate until the video is accessed successfully.
+    while video.isOpened():
+    
+        # Read a frame.
+        ok, frame = video.read()
+    
+        # Check if frame is not read properly.
+        if not ok:
+        
+            # Break the loop.
+            break
+    
+        # Flip the frame horizontally for natural (selfie-view) visualization.
+        #frame = cv2.flip(frame, 1)
+    
+        # Get the width and height of the frame
+        frame_height, frame_width, _ =  frame.shape
+    
+        # Resize the frame while keeping the aspect ratio.
+        frame = cv2.resize(frame, (int(frame_width * (640 / frame_height)), 640))
+    
+        # Perform Pose landmark detection.
+        frame, landmarks, landmarks_norm = detectPose(frame, pose_video, display=False)
+        
+        landmarks_norm = [x for x in landmarks_norm if x]
+        
+        train_input = np.array(landmarks_norm)
+        
+        if train_input.size == 0:
+            continue
+        
+        if count < maxlen:
+            x[:, count, :] = train_input[:, 0]
+            y[:, count, :] = train_input[:, 1]
+            z[:, count, :] = train_input[:, 2]
+            count += 1
+        else:
+            x = np.roll(x, -1, axis=1)
+            x[:, -1, :] = train_input[:, 0]
+            y = np.roll(y, -1, axis=1)
+            y[:, -1, :] = train_input[:, 1]
+            
+            z = np.roll(z, -1, axis=1)
+            z[:, -1, :] = train_input[:, 2]
+            
+        if delay == 4:
+            move, prediction_prob = prediction.classify(x, y, z, model)
+            delay = 0
+        else :
+            delay += 1
+        
+        # Set the time for this frame to the current time.
+        time2 = time()
+    
+        # Check if the difference between the previous and this frame time > 0 to avoid division by zero.
+        if (time2 - time1) > 0:
+    
+            # Calculate the number of frames per second.
+            frames_per_second = 1.0 / (time2 - time1)
+        
+            # Write the calculated number of frames per second on the frame. 
+            cv2.putText(frame, 'FPS: {}'.format(int(frames_per_second)), (10, 30),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
+            cv2.putText(frame, 'prediction: {}'.format(prediction_prob), (10, 100),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
+            cv2.putText(frame, 'move: ' + move, (10, 150),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
+    
+        # Update the previous frame time to this frame time.
+        # As this frame will become previous frame in next iteration.
+        time1 = time2
+    
+        # Display the frame.
+        cv2.imshow('Pose Detection', frame)
+    
+    
+        # Wait until a key is pressed.
+        # Retreive the ASCII code of the key pressed
+        k = cv2.waitKey(1) & 0xFF
+    
+        # Check if 'ESC' is pressed.
+        if(k == 27):
+            # Break the loop.
+            break
+            
+        if cv2.getWindowProperty('Pose Detection', cv2.WND_PROP_VISIBLE) < 1:        
+            break
+            
+    video.release()
+
+    # Close the windows.
+    cv2.destroyAllWindows()
 
 #mungkin pas buat dataset bisa tidak ditampilkan videonya dengan komen di bagian imshow
