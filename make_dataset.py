@@ -24,9 +24,9 @@ if __name__ == "__main__":
 
     print("MAKING DATASET, PLEASE WAIT!")
 
-    x, y = pose_detection.get_coordinates(classes, path, args.quiet, args.show)
+    x, y = pose_detection.make_dataset(classes, path, args.quiet, args.show)
 
-    print("DATASET COMPLETE")
+    print("MAKING DATASET COMPLETE")
 
     if args.train:
         np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/train_x"), x)
