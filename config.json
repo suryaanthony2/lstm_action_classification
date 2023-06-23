@@ -1,9 +1,12 @@
 {
     "epochs" : 1000,
-    "batch_size" : 16,
-    "lstm" : [256, 256, 256],
-    "dense" : 256,
-    "num_classes" : 5,
-    "maxlen" : 120,
-    "patience" : 50
+    "batch_size" : 32,
+    "lstm" : [64, 64, 64],
+    "dropout" : 0.5,
+    "dense" : 128,
+    "output" : 5,
+    "padding" : 120,
+    "red_lr_patience" : 30,
+    "stp_patience" : 50,
+    "optimizer" : "adam"
 }
