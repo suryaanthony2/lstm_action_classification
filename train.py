@@ -4,17 +4,17 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import argparse
 import numpy as np
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.models import Model
 from tensorflow.keras import layers, Input
-from tensorflow.keras.optimizers import RMSprop
+import matplotlib.pyplot as plt
 import json
 import pathlib
 from random import shuffle
 
 parser = argparse.ArgumentParser(description="Train LSTM model using specified dataset")
 parser.add_argument("-s", "--summary", action="store_true", help="print model summary")
-group = parser.add_mutually_exclusive_group()
-group.add_argument("-v", "--verbose", action="store_true", help="print verbose")
+parser.add_argument("-v", "--verbose", action="store_true", help="print verbose")
+parser.add_argument("-g", "--graph", action="store_true", help="display model training graph")
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -40,28 +40,28 @@ if __name__ == "__main__":
     nn_input_y = Input(shape=input_y.shape[1:], name='y_input')
     nn_input_z = Input(shape=input_z.shape[1:], name='z_input')
 
-    mask_x = layers.Masking(mask_value=2.0)(nn_input_x)
-    lstm_x = layers.LSTM(cfg["lstm"][0])(mask_x)
+    mask_x = layers.Masking(mask_value=2.0, name="x_mask")(nn_input_x)
+    lstm_x = layers.LSTM(cfg["lstm"][0], name="x_lstm")(mask_x)
 
-    mask_y = layers.Masking(mask_value=2.0)(nn_input_y)
-    lstm_y = layers.LSTM(cfg["lstm"][1])(mask_y)
+    mask_y = layers.Masking(mask_value=2.0, name="y_mask")(nn_input_y)
+    lstm_y = layers.LSTM(cfg["lstm"][1], name="y_lstm")(mask_y)
 
-    mask_z = layers.Masking(mask_value=2.0)(nn_input_z)
-    lstm_z = layers.LSTM(cfg["lstm"][2])(mask_z)
+    mask_z = layers.Masking(mask_value=2.0, name="z_mask")(nn_input_z)
+    lstm_z = layers.LSTM(cfg["lstm"][2], name="z_lstm")(mask_z)
 
-    concatenated = layers.concatenate([lstm_x, lstm_y, lstm_z])
+    concatenated = layers.concatenate([lstm_x, lstm_y, lstm_z], name="concatenate")
 
-    #dropout = layers.Dropout(0.5)(concatenated)
+    dropout = layers.Dropout(cfg["dropout"], name="dropout")(concatenated)
 
-    dense = layers.Dense(cfg["dense"], activation='relu', )(concatenated)
+    dense = layers.Dense(cfg["dense"], activation='relu', name="dense")(dropout)
 
     #dropout = layers.Dropout(0.5)(dense)
 
-    out = layers.Dense(cfg["num_classes"], activation='softmax')(dense)
+    out = layers.Dense(cfg["output"], activation='softmax', name="output")(dense)
 
     model = Model([nn_input_x, nn_input_y, nn_input_z], out)
 
-    model.compile(optimizer="rmsprop",
+    model.compile(optimizer=cfg["optimizer"],
                 loss="sparse_categorical_crossentropy",
                 metrics=["acc"])
 
@@ -69,12 +69,12 @@ if __name__ == "__main__":
         model.summary()
 
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1,
-                              patience=(cfg["patience"] * 0.6 ))
+                              patience=30)
 
     early_stopping_monitor = EarlyStopping(
         monitor='val_acc',
         min_delta=0,
-        patience=cfg["patience"],
+        patience=50,
         verbose=0,
         mode='auto',
         baseline=None,
@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
     print("TRAINING MODEL, PLEASE WAIT!")
 
-    model.fit(
+    history = model.fit(
         x=[input_x, input_y, input_z],
         y=y,
         verbose=verb,
@@ -93,6 +93,22 @@ if __name__ == "__main__":
         callbacks=[early_stopping_monitor, reduce_lr]
     )
 
+    print("TRAINING COMPLETE!")
+
     model.save(os.fspath(pathlib.Path(__file__).parent.parent / "model/LSTM_model"), save_format="h5")
 
-    print("TRAINING COMPLETE!")
+    if args.graph:
+        figure, axis = plt.subplots(1, 2, figsize=(10, 6))
+        axis[0].plot(history.history['acc'],'--')
+        axis[0].plot(history.history['val_acc'])
+        axis[0].set_title('model accuracy')
+        axis[0].set(xlabel='epoch', ylabel='accuracy')
+        axis[0].legend(['train', 'test'], loc='upper left')
+
+        axis[1].plot(history.history['loss'],'--')
+        axis[1].plot(history.history['val_loss'])
+        axis[1].set_title('model loss')
+        axis[1].set(xlabel='epoch', ylabel='loss')
+        axis[1].legend(['train', 'test'], loc='upper left')
+        
+        plt.show()
