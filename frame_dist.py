@@ -18,7 +18,6 @@ for k, v in d_frame.items():
     count += v
     print(k, count)
     if count >= total_thresh_vid:
-        #print(str(int(threshold * 100)) + "% dari video yang digunakan memiliki jumlah frame kurang dari sama dengan " + str(k) + " frame")
         break
 
 fig, ax = plt.subplots(figsize=(7, 6))
