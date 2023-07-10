@@ -11,14 +11,14 @@ parser.add_argument("-q", "--quiet", action="store_true", help="hide progress on
 parser.add_argument("-s", "--show", action="store_true", help="show video being processed")
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument("-t", "--train", action="store_true", help="make training dataset")
-group.add_argument("-v", "--val", action="store_true", help="make validation dataset")
+group.add_argument("-u", "--test", action="store_true", help="make testing dataset")
 args = parser.parse_args()
 
 if __name__ == "__main__":
     if args.train:
         path = str(pathlib.Path().resolve()) + "\\video\\train"
-    elif args.val:
-        path = str(pathlib.Path().resolve()) + "\\video\\validation"
+    elif args.test:
+        path = str(pathlib.Path().resolve()) + "\\video\\test"
 
     classes = os.listdir(path)
 
@@ -31,6 +31,6 @@ if __name__ == "__main__":
     if args.train:
         np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/train_x"), x)
         np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/train_y"), y)
-    elif args.val:   
-        np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/val_x"), x)
-        np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/val_y"), y) 
+    elif args.test:   
+        np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/test_x"), x)
+        np.save(os.fspath(pathlib.Path(__file__).parent.parent / "dataset/test_y"), y) 

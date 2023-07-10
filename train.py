@@ -19,19 +19,29 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     verb = 0
+    val = True
+
     if args.verbose:
         verb = 1
     
     with open(os.fspath(pathlib.Path(__file__).parent / "config.json"), "r") as f:
         cfg = json.load(f)
 
-    x = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/train_x.npy"))
-    y = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/train_y.npy"))
-    x_val = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/val_x.npy"))
-    y_val = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/val_y.npy"))
-
+    try:
+        x = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/train_x.npy"))
+        y = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/train_y.npy"))
+        x_val = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/test_x.npy"))
+        y_val = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/test_y.npy"))
+        val_x, val_y, val_z = np.split(x_val, 3)
+    except:
+        x = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/train_x.npy"))
+        y = np.load(os.fspath(pathlib.Path(__file__).parent / "dataset/train_y.npy"))
+        print("Validation dataset not found, Early stopping not used")
+        print("Using tarining dataset only")
+        epochs = int(input("Enter the number of training epochs: "))
+        val = False
+    
     input_x, input_y, input_z = np.split(x, 3)
-    val_x, val_y, val_z = np.split(x_val, 3)
 
     ind_list = list(range(input_x.shape[0]))
     shuffle(ind_list)
@@ -51,11 +61,9 @@ if __name__ == "__main__":
 
     concatenated = layers.concatenate([lstm_x, lstm_y, lstm_z], name="concatenate")
 
-    dropout = layers.Dropout(cfg["dropout"], name="dropout")(concatenated)
+    dropout = layers.Dropout(0.5, name="dropout")(concatenated)
 
     dense = layers.Dense(cfg["dense"], activation='relu', name="dense")(dropout)
-
-    #dropout = layers.Dropout(0.5)(dense)
 
     out = layers.Dense(cfg["output"], activation='softmax', name="output")(dense)
 
@@ -83,15 +91,24 @@ if __name__ == "__main__":
 
     print("TRAINING MODEL, PLEASE WAIT!")
 
-    history = model.fit(
-        x=[input_x, input_y, input_z],
-        y=y,
-        verbose=verb,
-        batch_size=cfg["batch_size"],
-        epochs=cfg["epochs"],
-        validation_data=([val_x, val_y, val_z], y_val),
-        callbacks=[early_stopping_monitor, reduce_lr]
-    )
+    if val:
+        history = model.fit(
+            x=[input_x, input_y, input_z],
+            y=y,
+            verbose=verb,
+            batch_size=cfg["batch_size"],
+            epochs=cfg["epochs"],
+            validation_data=([val_x, val_y, val_z], y_val),
+            callbacks=[early_stopping_monitor, reduce_lr]
+        )
+    else:
+        history = model.fit(
+            x=[input_x, input_y, input_z],
+            y=y,
+            verbose=verb,
+            batch_size=cfg["batch_size"],
+            epochs=epochs
+        )     
 
     print("TRAINING COMPLETE!")
 
