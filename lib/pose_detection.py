@@ -116,6 +116,9 @@ def get_coordinates(path):
 def detect_real_time(camera, model, flip=False):
     pose_video = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.3, model_complexity=1)
 
+    min_fps = 100
+    max_fps = 0
+    delay_frame = 0
     maxlen = padding
 
     x = np.full((1, maxlen, 23), 2.0)
@@ -123,7 +126,7 @@ def detect_real_time(camera, model, flip=False):
     z = np.full((1, maxlen, 23), 2.0)
     
     count = 0
-    delay = 5
+    delay = 4
     
     video = cv2.VideoCapture(camera)
 
@@ -180,24 +183,31 @@ def detect_real_time(camera, model, flip=False):
             z = np.roll(z, -1, axis=1)
             z[:, -1, :] = train_input[:, 2]
             
-        if delay == 5:
+        if delay == 4:
             move, prediction_prob = prediction.classify(x, y, z, model)
             delay = 0
         else :
+            print(min_fps)
             delay += 1
         
         time2 = time()
     
         if (time2 - time1) > 0:
 
-            frames_per_second = 1.0 / (time2 - time1)
+            fps = int(1.0 / (time2 - time1))
+            if delay_frame == 10:
+                if fps < min_fps:
+                    min_fps = fps
+            else:
+                delay_frame += 1
+            if fps > max_fps:
+                max_fps = fps
 
-            cv2.putText(frame, 'FPS: {}'.format(int(frames_per_second)), (10, 30),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
+            cv2.putText(frame, 'FPS: {}'.format(fps), (10, 30),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
             cv2.putText(frame, 'prediction: {}'.format(prediction_prob), (10, 100),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
             cv2.putText(frame, 'move: ' + move, (10, 150),cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
     
         time1 = time2
-
         cv2.imshow('Pose Detection', frame)
 
         k = cv2.waitKey(1) & 0xFF
@@ -213,10 +223,12 @@ def detect_real_time(camera, model, flip=False):
 
     cv2.destroyAllWindows()
 
+    print(f"Min fps = {min_fps}, max fps = {max_fps}")
+
 def get_frame_dist():
     print("Menghitung jumlah frame, mohon tunggu!")  
     frame_in_video = {}
-    directory = ["train", "validation"]
+    directory = ["train", "test"]
     path = str(pathlib.Path().resolve()) + "\\video\\"
 
     for folder in directory:    
